@@ -1,5 +1,5 @@
-{ lib, config, ... }:
 
+{ lib, config, dsl, ... }:
 let
   inherit (lib) replaceStrings mkOption types flatten mapAttrsToList mapAttrs filterAttrs concatStringsSep filter attrValues;
   mkMappingOption = description: mkOption {
@@ -87,7 +87,6 @@ in
   config =
     let
       trace = it: builtins.trace (builtins.toJSON it) it;
-      dsl = import ./dsl.nix { inherit lib; };
 
       filterNonNull = mappings: filterAttrs (name: value: value != null) mappings;
 

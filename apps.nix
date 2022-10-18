@@ -1,12 +1,12 @@
-{ utils, pkgs, lib ? pkgs.lib }:
+{ utils, pkgs, lib ? pkgs.lib, dsl }:
 let
   generateMarkdown = optionsFile:
     let
-      dsl = import ./lib/dsl.nix { inherit lib; };
       options = (pkgs.lib.evalModules {
-        modules = [ optionsFile ];
-
-        specialArgs = { inherit pkgs dsl; };
+        modules = [
+          { _module.args = { inherit pkgs dsl; }; }
+          optionsFile
+        ];
       }).options;
     in
     (pkgs.nixosOptionsDoc { inherit options; }).optionsCommonMark;

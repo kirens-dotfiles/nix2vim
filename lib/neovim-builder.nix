@@ -1,16 +1,17 @@
-{ pkgs, lib }:
+{ pkgs, lib, dsl }:
 
 with lib;
-{ ... }@config:
+config:
 let
-  dsl = import ./dsl.nix { inherit lib; };
   result = evalModules {
     modules = [
+      {
+        _module.args = lib.mapAttrs (_: lib.mkDefault) { inherit pkgs dsl; };
+      }
       ./api.options.nix
       ./wrapper.options.nix
       config
     ];
-    specialArgs = { inherit pkgs dsl; };
   };
 in
 result.config.drv

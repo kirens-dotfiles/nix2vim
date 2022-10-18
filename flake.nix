@@ -17,6 +17,7 @@
         neovimBuilder = import ./lib/neovim-builder.nix {
           pkgs = final;
           lib = final.lib;
+          inherit dsl;
         };
 
         nix2vimDemo = final.neovimBuilder {
@@ -55,7 +56,7 @@
       in
       {
         packages.default = pkgs.nix2vimDemo;
-        apps = import ./apps.nix { inherit pkgs; utils = flake-utils.lib; };
+        apps = import ./apps.nix { inherit pkgs dsl; utils = flake-utils.lib; };
         checks = import ./checks { inherit pkgs dsl; check-utils = import ./check-utils.nix; };
       }
     );
