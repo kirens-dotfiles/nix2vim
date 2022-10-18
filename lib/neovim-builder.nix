@@ -14,4 +14,8 @@ let
     ];
   };
 in
-result.config.drv
+result.config.drv.overrideAttrs (attrs: {
+  passthru = attrs.passthru // {
+    inherit (result) config options;
+  };
+})

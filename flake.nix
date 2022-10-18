@@ -56,6 +56,7 @@
       in
       {
         packages.default = pkgs.nix2vimDemo;
+        packages.luafile = pkgs.nix2vimDemo.passthru.config.luafile;
         apps = import ./apps.nix { inherit pkgs dsl; utils = flake-utils.lib; };
         checks = import ./checks { inherit pkgs dsl; check-utils = import ./check-utils.nix; };
       }

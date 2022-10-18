@@ -39,6 +39,12 @@ in
       readOnly = true;
     };
 
+    luafile = mkOption {
+      type = types.package;
+      description = "This option contains the store path that represents the lua config.";
+      readOnly = true;
+    };
+
     extraPython3Packages = mkOption {
       type = types.functionTo (types.listOf types.package);
       default = _: [ ];
@@ -111,6 +117,7 @@ in
   config = {
     packages.nix2vim = { start = config.plugins; opt = config.optionalPlugins; };
 
+    luafile = pkgs.writeText "nix2vim.lua" cfg.lua;
     drv = pkgs.wrapNeovim cfg.package {
       inherit (cfg) withNodeJs withPython3 withRuby extraMakeWrapperArgs extraPython3Packages extraLuaPackages;
       viAlias = cfg.enableViAlias;
@@ -123,7 +130,7 @@ in
         customRC = ''
           ${cfg.vimscript}
 
-          luafile ${pkgs.writeText "nix2vim.lua" cfg.lua}
+          luafile ${cfg.luafile}
         '';
       };
     };
