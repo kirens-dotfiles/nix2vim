@@ -1,7 +1,6 @@
-
-{ lib, config, dsl, ... }:
+{ lib, config, dsl, dag, ... }:
+with lib;
 let
-  inherit (lib) replaceStrings mkOption types flatten mapAttrsToList mapAttrs filterAttrs concatStringsSep filter attrValues;
   mkMappingOption = description: mkOption {
     inherit description;
     example = { abc = ":FZF<CR>"; C-p = ":FZF<CR>"; }; # Probably should be overwritten per option basis
@@ -54,7 +53,13 @@ in
     };
 
     lua = mkOption {
-      type = types.lines;
+      type = dag.types.dagOfLinesWith {
+        defaultEntry = dag.entryBetween ["userLuaEnd"] ["userLuaStart"];
+        merge = r: concatStrings (map ({ name, data }: ''
+          -- ${name}
+          ${data}
+        '') r);
+      };
       default = "";
       description = "Lua config";
     };
@@ -124,15 +129,6 @@ in
         t = config.tmap;
       };
 
-      requireBuilder = name: name_inner: value_inner:
-        let
-          varName = replaceStrings [ "-" "." ] [ "_" "_" ] name;
-        in
-        ''
-          local ${varName} = require('${name}')
-          ${varName}.${dsl.attrs2Lua {${name_inner} = value_inner; }}
-        '';
-
       functions = mapAttrsToList
         (name: value: ''
           function ${name}()
@@ -140,26 +136,61 @@ in
           end
         '')
         config.function;
-      require = flatten (mapAttrsToList (name: value: mapAttrsToList (requireBuilder name) value) config.use);
+
+      requireBuilder = name: module: #name_inner: value_inner:
+        let
+          varName = replaceStrings [ "-" "." ] [ "_" "_" ] name;
+          eachAttr = mapper: mapAttrsToList mapper module;
+        in [ {
+          name = "mod_${name}";
+          value = dag.between "importsEnd" "importsStart" ''
+            local ${varName} = require('${name}')
+          '';
+        } ] ++ eachAttr (attr: val: {
+          name = "mod_${name}.${attr}";
+          value = dag.between "importsEnd" "mod_${name}" ''
+            ${varName}.${dsl.attrs2Lua {${attr} = val; }}
+          '';
+        });
+
+      require = listToAttrs (flatten (mapAttrsToList requireBuilder config.use));
     in
     {
       vim.opt = config.set;
       use = mapAttrs (_: it: { setup = dsl.callWith it; }) config.setup;
 
-      lua = ''
-        ${toString functions}
+      lua = with dag; {
+        docStart = before "generatedFunctions" "";
 
-        local _cmp_nvim_lsp_present, _cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
-        local capabilities = nil
-        if present then
-            capabilities = require("cmp_nvim_lsp").update_capabilities(vim.lsp.protocol.make_client_capabilities())
-        end
+        generatedFunctions =
+          before "generatedConfig"
+          (concatStringsSep "\n" functions);
 
-        ${dsl.attrs2Lua { inherit (config) vim; }}
-        ${toString require}
-        local map = vim.api.nvim_set_keymap
-        ${noremaps}
-        ${remaps}
-      '';
+        lspSetup = between "generatedConfig" "generatedFunctions" ''
+          local _cmp_nvim_lsp_present, _cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
+          local capabilities = nil
+          if present then
+              capabilities = require("cmp_nvim_lsp").update_capabilities(vim.lsp.protocol.make_client_capabilities())
+          end
+        '';
+
+        generatedConfig =
+          before "importsStart"
+          (dsl.attrs2Lua { inherit (config) vim; });
+
+        importsStart = before "importsEnd" "";
+        importsEnd = before "userLuaStart" "";
+
+        remapPrelude = entryBetween ["generatedNoremaps" "generatedRemaps"] ["importsEnd"] ''
+          local map = vim.api.nvim_set_keymap
+        '';
+        generatedNoremaps = before "userLuaStart" noremaps;
+        generatedRemaps = before "userLuaStart" remaps;
+
+        userLuaStart = before "userLuaEnd" "";
+        userLuaEnd = before "docEnd" "";
+
+        docEnd = entryAnywhere "";
+      } // require;
     };
 }

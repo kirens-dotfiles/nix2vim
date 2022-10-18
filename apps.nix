@@ -1,10 +1,10 @@
-{ utils, pkgs, lib ? pkgs.lib, dsl }:
+{ utils, pkgs, lib ? pkgs.lib, dsl, dag }:
 let
   generateMarkdown = optionsFile:
     let
       options = (pkgs.lib.evalModules {
         modules = [
-          { _module.args = { inherit pkgs dsl; }; }
+          { _module.args = { inherit pkgs dsl dag; }; }
           optionsFile
         ];
       }).options;

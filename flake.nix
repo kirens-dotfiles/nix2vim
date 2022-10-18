@@ -4,11 +4,17 @@
   inputs = {
     flake-utils.url = github:numtide/flake-utils;
     nixpkgs.url = github:NixOS/nixpkgs;
+    home-manager.url = github:nix-community/home-manager;
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, flake-utils, nixpkgs }:
+  outputs = { self, flake-utils, nixpkgs, home-manager }:
     let
       dsl = import ./lib/dsl.nix { inherit (nixpkgs) lib; };
+      dag = import ./lib/dag.nix {
+        inherit (nixpkgs) lib;
+        inherit (home-manager.lib) hm;
+      };
 
       overlay = final: _: {
 
@@ -17,7 +23,7 @@
         neovimBuilder = import ./lib/neovim-builder.nix {
           pkgs = final;
           lib = final.lib;
-          inherit dsl;
+          inherit dsl dag;
         };
 
         nix2vimDemo = final.neovimBuilder {
@@ -41,7 +47,7 @@
     in
     {
       inherit overlay;
-      lib.dsl = dsl;
+      lib = { inherit dsl dag; };
       templates.default = {
         path = ./template;
         description = "A very basic neovim configuration";
@@ -57,7 +63,7 @@
       {
         packages.default = pkgs.nix2vimDemo;
         packages.luafile = pkgs.nix2vimDemo.passthru.config.luafile;
-        apps = import ./apps.nix { inherit pkgs dsl; utils = flake-utils.lib; };
+        apps = import ./apps.nix { inherit pkgs dsl dag; utils = flake-utils.lib; };
         checks = import ./checks { inherit pkgs dsl; check-utils = import ./check-utils.nix; };
       }
     );
